@@ -107,6 +107,10 @@ class CustomDataset(Dataset):
                  load_bboxes=False,
                  bbox_min_area=100,
                  use_augmentations=False, augmentations=None, **kwargs):
+        
+        print("ABOUT TO PASS kwargs:", kwargs)          # or dataset_cfg / dataset_kwargs
+        print("DETECTION_CLASSES right now:", kwargs.get("DETECTION_CLASSES"))
+
         #self.pipeline = Compose(pipeline)
         self.img_dir = img_dir
         self.events_dir = events_dir
@@ -127,7 +131,7 @@ class CustomDataset(Dataset):
         self.label_map = None
         self.CLASSES, self.PALETTE = self.get_classes_and_palette(
             classes, palette)
-        self.custom_classes = kwargs.get('custom_classes', False)
+        self.custom_classes = kwargs.get('custom_classes', True)
         if self.custom_classes: 
             self.DETECTION_CLASSES = kwargs.get('DETECTION_CLASSES', None)
             assert self.DETECTION_CLASSES is not None, "DETECTION_CLASSES must be provided when custom_classes is True"
@@ -379,7 +383,8 @@ class CustomDataset(Dataset):
         ann_info = self.get_ann_info(idx)
         results = dict(img_info=img_info, event_info=event_info, ann_info=ann_info, idx=idx)
         if 'BB' in self.outputs:
-            bboxes_cxcywh, _ = self.extract_bboxes_from_json_polygons(idx)
+            out = self.extract_bboxes_from_json_polygons(idx)
+            bboxes_cxcywh = out[0]
                 # 2. Convert bboxes to albumentations format (pascal_voc)
             
         # --- Apply Augmentations if enabled ---
@@ -899,8 +904,8 @@ class CustomDataset(Dataset):
                    - padding_info contains transformation details
         """
         # Get original bounding boxes
-        bboxes, _ = self.extract_bboxes_from_json_polygons(idx)
-        
+        out = self.extract_bboxes_from_json_polygons(idx)
+        bboxes = out[0]
         # Get padding and scaling information
         _, _, padding_info = self.load_and_resize_image(idx, target_size) if self.img_dir is not None else self.load_and_resize_events(idx, target_size)
         

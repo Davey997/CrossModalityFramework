@@ -6,17 +6,15 @@ device: cuda  # or cpu
 # Data parameters
 dataset:
   name: DSEC_Night
-  data_dir: /data
+  data_dir: ./dataset  #./data/DSEC_Night 
   batch_size: 4
   num_workers: 4
   outputs: ["image", "BB", "labels", "img_metas"] # these mandatory for unimodal training
   bb_num_classes: 8 # according to DSEC
-  train_split: "night_dataset.txt"
-  val_split: "night_test_dataset.txt"
+  train_split: "night_dataset_warp.txt"
+  val_split: "night_test_dataset_warp.txt"
 
 # Model parameters TODO
-
-
 
 model:
   name: 'resnet50_yolox'
@@ -50,7 +48,7 @@ trainer:
   log_interval: 100 # steps
   val_interval: 500 # steps
   checkpoint_interval_epochs: 5 # save checkpoint every 5 epochs
-  save_folder: 
+  save_folder: experiments/dsec/baseline/unimodal
 
 # Scheduler parameters (optional)
 scheduler:

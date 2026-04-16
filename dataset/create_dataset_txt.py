@@ -10,13 +10,18 @@ import argparse
 # and generates dataset text files for training and testing.
 
 def create_images_to_events_index(images_timestamps_path, events_h5_path, output_txt_path):
+    os.makedirs(os.path.dirname(output_txt_path), exist_ok=True)
+
     if os.path.isfile(output_txt_path):
         os.remove(output_txt_path)
+
     images_to_events_index_list = []
     events_h5 = h5py.File(events_h5_path, 'r')
+
     events_t = events_h5['events/{}'.format('t')]  # (391111416,)
     t_offset = int(events_h5['t_offset'][()])
     ms_to_idx = np.asarray(events_h5['ms_to_idx'], dtype='int64')  # (59001,)
+
     images_timestamps = np.loadtxt(images_timestamps_path, dtype='int64')  # (1181,)
     for i in tqdm(range(images_timestamps.shape[0])):
         timestamps_us = images_timestamps[i] - t_offset
@@ -57,9 +62,19 @@ def images_to_events_index_all(dst_path):
         if 'zurich_city_' not in file_name:
             continue
         print('processing {}...'.format(file_name))
-        images_timestamps_path = '{}{}/images/timestamps.txt'.format(dst_path, file_name)
-        events_h5_path = '{}{}/events/left/events.h5'.format(dst_path, file_name)
-        output_txt_path = '{}{}/images/images_to_events_index.txt'.format(dst_path, file_name)
+        #These lines are commented out as I debug -David
+
+        #images_timestamps_path = '{}{}/images/timestamps.txt'.format(dst_path, file_name)
+        #events_h5_path = '{}{}/events/left/events.h5'.format(dst_path, file_name)
+        #output_txt_path = '{}{}/images/images_to_events_index.txt'.format(dst_path, file_name)
+
+        #Adapted to David's repo 
+        images_dir = os.path.join(dst_path, "zurich_city_09_a_images_rectified_left")
+        images_timestamps_path = os.path.join(images_dir, "timestamps.txt")  # si no existe, se puede generar
+        events_h5_path = os.path.join(dst_path, "zurich_city_09_a_events_left", "events.h5")
+        output_txt_path = os.path.join(images_dir, "images_to_events_index.txt")
+        
+        #esto tiene que ir a parar a data/DSEC_Night/zurich_city_09_a_images_rectified_left/
         create_images_to_events_index(images_timestamps_path, events_h5_path, output_txt_path)
 
 
@@ -88,9 +103,61 @@ def create_dsec_dataset(dst_path, dataset_txt_path, events_num, image_change_num
     # images_to_events_index_path, events_h5_path, events_num, events_path_txt
 
     for file_name in file_list:
-        if 'zurich_city_' not in file_name:
+        if file_name != "zurich_city_09_a_images_rectified_left":
             continue
-        city_name = file_name.split('zurich_city_')[-1]
+        #if 'zurich_city_' not in file_name:
+            #continue
+        #city_name = file_name.split('zurich_city_')[-1]
+
+        city = "zurich_city_09_a"
+
+        #images_dir = os.path.join(
+        #    dst_path,
+        #    f"{city}_images_rectified_left"
+        #)
+
+        images_dir = os.path.join(dst_path, "zurich_city_09_a_images_rectified_left")
+        images_to_events_index_path = os.path.join(
+            images_dir, "images_to_events_index.txt"
+        )
+
+        images_list_path = images_dir
+
+        events_path = os.path.join(
+            dst_path,
+            f"{city}_events_left",
+            "events.h5"
+        )
+
+        #images_to_events_index_path = os.path.join(
+        #    images_dir,
+        #    "images_to_events_index.txt"
+        #)
+
+        images_to_events_index = np.loadtxt(
+            images_to_events_index_path,
+            dtype='int64'
+        )
+
+        events = h5py.File(events_path, 'r')
+
+        images_list = sorted(os.listdir(images_dir))
+
+        #debug attempt to generate same-sized images and events batches
+        n = min(len(images_list), len(images_to_events_index))
+        for i in range (n): 
+            image_name = images_list[i]
+            image_path = os.path.join(images_dir, image_name)
+            dataset_txt.write(
+                image_path + ' ' + str(images_to_events_index[i]) + '\n'
+            )
+
+        #Original, commented out for debugging purposes 
+        #for i, image_name in enumerate(images_list):
+         #   image_path = os.path.join(images_dir, image_name)
+          #  dataset_txt.write(
+           #     image_path + ' ' + str(images_to_events_index[i]) + '\n'
+            #)
 
         if labels_txt:
             if not os.path.isdir('{}{}/labels/'.format(dst_path, file_name)):
@@ -104,18 +171,23 @@ def create_dsec_dataset(dst_path, dataset_txt_path, events_num, image_change_num
 
         print('processing {}...'.format(file_name))
 
-        images_to_events_index_path = '{}{}/images/images_to_events_index.txt'.format(dst_path, file_name)
-        images_to_events_index = np.loadtxt(images_to_events_index_path, dtype='int64')
+        #images_to_events_index_path = os.path.join(
+        #    dst_path, f"{file_name}_images_rectified_left", "images_to_events_index.txt"
+        #)  #'{}{}/images/images_to_events_index.txt'.format(dst_path, file_name)
+        #images_to_events_index = np.loadtxt(images_to_events_index_path, dtype='int64')
 
-        events = h5py.File('{}{}/events/left/events.h5'.format(dst_path, file_name), 'r')
+        #events = h5py.File(os.path.join(dst_path, f"{file_name}_events_left", "events.h5"), 'r')
         events_total_num = int(events['events/t'].shape[0])
 
-        images_list_path = '{}{}/images/left/rectified/'.format(dst_path, file_name)
+        #images_list_path = os.path.join(dst_path, f"{file_name}_images_rectified_left")  #'{}{}/images/left/rectified/'.format(dst_path, file_name)
         if not warp_images_flag:
             images_list = os.listdir(images_list_path)
             images_list.sort()
 
-            assert images_to_events_index.shape[0] == len(images_list)
+            #assert images_to_events_index.shape[0] == len(images_list)
+            min_len = min(len(images_list), images_to_events_index.shape[0])
+            images_list = images_list[:min_len]
+            images_to_events_index = images_to_events_index[:min_len]
         else:
             images_list = []
             for i in range(images_to_events_index.shape[0]):
@@ -136,14 +208,22 @@ def create_dsec_dataset(dst_path, dataset_txt_path, events_num, image_change_num
                 dataset_txt.write(images_path + ' ' + str(images_to_events_index[i]) + '\n')
     dataset_txt.close()
 
+#David's edit
+def generate_timestamps_from_images(images_dir):
+    png_files = sorted([f for f in os.listdir(images_dir) if f.endswith(".png")])
+    timestamps = np.arange(len(png_files)) * 10000  # ejemplo: 10 ms entre frames
+    ts_path = os.path.join(images_dir, "timestamps.txt")
+    np.savetxt(ts_path, timestamps, fmt='%d')
+    return ts_path
 
 if __name__ == '__main__':
     print('create_dsec_dataset_txt.py')
 
     # root path of the DSEC_Night dataset
 
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    root_dir = dir_path.split("dataset")[0] + "data/DSEC_Night/"
+    dir_path = os.path.dirname(os.path.realpath(__file__)) #.../dataset
+    repo_root = os.path.dirname(dir_path) #repo's pure path
+    root_dir =  os.path.join(repo_root, "data", "DSEC_Night") #root directory I intended in the first place
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--root_dir', type=str, default=root_dir)
@@ -151,14 +231,28 @@ if __name__ == '__main__':
 
     labels_range = {'09_a': (0, 794), '09_b': (0, 162 - 13), '09_c': (0, 594 - 13),
                     '09_d': (0, 756 - 13), '09_e': (0, 378 - 13)}
+    
+    ######
+    #for file_name in os.listdir(opt.root_dir):
+        #if 'zurich_city_' not in file_name:
+            #continue
+        #images_dir = os.path.join(opt.root_dir) #, f"{file_name}_images_rectified_left"
+        #if not os.path.exists(os.path.join(images_dir, "timestamps.txt")): 
+            #generate_timestamps_from_images(images_dir) #esto debe generar nuestro timestamps en la carpeta de las png's
+    
+    images_dir = os.path.join(opt.root_dir, "zurich_city_09_a_images_rectified_left" )
 
-    images_to_events_index_all(opt.root_dir)    
-    create_dsec_dataset(dst_path=opt.root_dir,
-                        dataset_txt_path= 'night_dataset.txt',
+    if not os.path.exists(os.path.join(images_dir, "timestamps.txt")): 
+            generate_timestamps_from_images(images_dir)
+    ######
+    
+    images_to_events_index_all(opt.root_dir)    #necesito que opt.root_dir me lleve a data/DSEC_Night
+    create_dsec_dataset(dst_path=root_dir,
+                        dataset_txt_path= 'night_dataset_warp.txt',
                         events_num=0, labels_txt=False, labels_range=labels_range, image_change_num=1,
                         warp_images_flag=False)
 
-    create_dsec_dataset(dst_path=opt.root_dir,
-                        dataset_txt_path='night_test_dataset.txt',
+    create_dsec_dataset(dst_path=root_dir, #give it the path to this same folder; dataset
+                        dataset_txt_path='night_test_dataset_warp.txt', #name correction
                         events_num=0, labels_txt=True, labels_range=None, image_change_num=1,
                         warp_images_flag=False)

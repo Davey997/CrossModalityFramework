@@ -116,7 +116,7 @@ class UnimodalBackbone(nn.Module):
 
 class DualModalityBackbone(nn.Module):
     def __init__(self, rgb_backbone, event_backbone, pretrained=True,
-                 embed_dim=256, img_size=224, model_name='',outputs=['preflatten_feat', 'flatten_feat', 'projected_feat']):
+                 embed_dim=256, img_size=224, model_name='',outputs=['preflatten_feat', 'flatten_feat', 'projected_feat'], output_indices=None):
         """
         Args:
             rgb_backbone: Timm model name or custom module
@@ -131,9 +131,9 @@ class DualModalityBackbone(nn.Module):
         self.img_size = img_size
 
         self.rgb_backbone = UnimodalBackbone(rgb_backbone, embed_dim=embed_dim, img_size=img_size, 
-                             model_name=model_name, outputs=outputs)        
+                             model_name=model_name, outputs=outputs, output_indices=output_indices)        
         self.event_backbone = UnimodalBackbone(event_backbone, embed_dim=embed_dim, img_size=img_size, 
-                             model_name=model_name, outputs=outputs)
+                             model_name=model_name, outputs=outputs, output_indices=output_indices)
 
         self.rgb_projector = nn.Sequential(
             nn.Linear(self.rgb_backbone.get_feature_output_dim(), embed_dim),

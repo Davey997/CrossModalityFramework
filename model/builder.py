@@ -11,7 +11,11 @@ def check_backbone_params(cfg):
     :param cfg: The configuration dictionary.
     :return: True if both event and rgb backbones are specified, False otherwise.  Also returns the specified backbone
     """
-    assert 'model' in cfg.keys() or ('model1' in cfg.keys() and 'model2' in cfg.keys()), "Error - specify the model architecture"
+
+    print("CFG TYPE:", type(cfg))
+    print("CFG KEYS:", cfg.keys())
+
+    assert ('model' in cfg.keys()) or ('model1' in cfg.keys() and 'model2' in cfg.keys()) or ('model_proposal' in cfg.keys()), "Error - specify the model architecture"
     if 'model' in cfg.keys():
         assert 'backbone' in cfg['model'].keys(), "Error - specify the backbone parameters"
         cfg_b = cfg['model']['backbone']
@@ -82,6 +86,7 @@ def build_model_from_cfg(cfg):
         model_class2 = getattr(module2, model_class_name2)
         if prtraind_w2_path is not None:
             if DEBUG>=1: logger.info(f"Loading pretrained weights for model2 from {prtraind_w2_path}")
+
             prtraind_w2 = torch.load(prtraind_w2_path)
             if "config" in prtraind_w2.keys():
                 if DEBUG>=1: logger.info("The pretrained weights contain a config file, using this to create the model, IGNORING the current config")
@@ -91,8 +96,14 @@ def build_model_from_cfg(cfg):
                 model2 = model_class2(**model_cfg2)
 
             model2.load_state_dict(get_model_dict(prtraind_w2), strict=False)
-        model2 = model_class2(**model_cfg2)
+            model2 = model_class2(**model_cfg2)
         return (model1, model2)
+    #adding the fusion module for dual modality
+    elif cfg.get('fusion_module'):
+        model_cfg = cfg['fusion_module']
+        module = importlib.import_module(f"model.{model_cfg['name']}")
+        model_class = getattr(module, model_cfg['name'].capitalize())
+        model = model_class(**model_cfg)
     else:
         model_cfg = cfg['model']
         prtraind_w_path = model_cfg.get('pretrained_weights', None)

@@ -18,10 +18,12 @@ def build_from_config(data_loader, cfg: Dict[str, Any]):
     
     
     cfg_eval = cfg.get('evaluator', None)
-    assert cfg_eval is not None, "Evaluator configuration cannot be empty"
+    #assert cfg_eval is not None, "Evaluator configuration cannot be empty"
+    if cfg_eval is None:
+        return None
     assert 'conf_threshold' in cfg_eval.keys(), " specify 'conf_threshold' evaluator param"
     assert 'nms_threshold' in cfg_eval.keys(), " specify 'nms_threshold' evaluator param"
-    assert 'bb_num_classes' in cfg['dataset'].keys(), " specify 'bb_num_classes' dataset param"
+    #assert 'bb_num_classes' in cfg['dataset'].keys(), " specify 'bb_num_classes' dataset param"
 
     dataset_type = cfg['dataset']['name'].lower()
 
@@ -35,7 +37,7 @@ def build_from_config(data_loader, cfg: Dict[str, Any]):
         return eval1, eval2
     else:
         in_size = cfg['model']['input_size'] if 'input_size' in cfg['model'].keys() else 512
-        return _build_unimodal_evaluator(dataset_type, data_loader, img_size=(in_size, in_size), confthre=confthre, nmsthre=nmsthre, num_classes=cfg['dataset']['bb_num_classes'], device=cfg['device'])
+        return _build_unimodal_evaluator(dataset_type, data_loader, img_size=(in_size, in_size), confthre=confthre, nmsthre=nmsthre, num_classes=cfg['dataset']['bb_num_classes'], device=cfg['device']) 
 
 
 def _build_unimodal_evaluator(dataset_type, data_loader, img_size, confthre, nmsthre, num_classes, device, input_type=None):

@@ -7,11 +7,13 @@ from torchvision import models
 from tqdm import tqdm
 from loguru import logger
 import numpy as np
+import matplotlib.pyplot as plt
 
 from utils.helpers import DEBUG,DEBUG_EVAL, Timing, deep_dict_equal
 import time
 from datetime import datetime
 import sys
+import csv
 import os
 import wandb
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -52,6 +54,8 @@ class DualModalityTrainer(Trainer):
             self.model2 = None
 
         self.criterion = criterion
+        self.train_losses = []
+        self.val_losses = []
 
         self._get_loss_keys()
         # Store criterion for contrastive loss between modalities
@@ -102,7 +106,12 @@ class DualModalityTrainer(Trainer):
         # Extract modalities from batch
         rgbs = torch.stack([item["image"] for item in batch]).to(self.device)
         events = torch.stack([item["events"] for item in batch]).to(self.device)
+
         targets = torch.stack([item["BB"] for item in batch]).to(self.device)
+
+        print(batch[0]['label'])
+        print(type(batch[0]['label']))
+        
         self.optimizer.zero_grad()
         if self.model2 is not None:
             # Two separate models approach
@@ -111,7 +120,7 @@ class DualModalityTrainer(Trainer):
             
         else:
             # Single dual-modality model
-            out_dict1 = self.model1(rgbs, events)
+            out_dict1 = self.model1(rgbs, events, targets)
             out_dict2 = None
         
         tot_loss1 = out_dict1['total_loss']
@@ -119,9 +128,16 @@ class DualModalityTrainer(Trainer):
         losses_1 = out_dict1['losses']
         losses_2 = out_dict2['losses'] if out_dict2 is not None else None
         bb_out = out_dict1['backbone_features'][self.feature], out_dict2['backbone_features'][self.feature] if out_dict2 is not None else None
+        
         # Compute loss between modalities
-        bb_loss = self.criterion(*bb_out)
-        tot_loss = bb_loss + tot_loss1 + (tot_loss2 if tot_loss2 is not None else 0)
+        if out_dict2 is not None:
+            bb_loss = self.criterion(*bb_out)
+            tot_loss = bb_loss + tot_loss1 + (tot_loss2 if tot_loss2 is not None else 0)
+        else: 
+            # Single dual-modality model — no contrastive backbone loss
+            bb_loss = torch.tensor(0.0, device=self.device)
+            tot_loss = tot_loss1
+
         tot_loss.backward()
         self.optimizer.step()
 
@@ -169,11 +185,11 @@ class DualModalityTrainer(Trainer):
                         self.scheduler.step()
                 
                 # Save checkpoint at epoch intervals
-                if (self.checkpoint_interval_epochs > 0 and (epoch + 1) % self.checkpoint_interval_epochs == 0):
-                    if self.save_folder is not None:
-                        self._save_checkpoint(epoch)
-                    else:
-                        logger.warning("The model will not be saved - saving folder need to be specified")
+                #if (self.checkpoint_interval_epochs > 0 and (epoch + 1) % self.checkpoint_interval_epochs == 0):
+                 #   if self.save_folder is not None:
+                  #      self._save_checkpoint(epoch)
+                   # else:
+                    #    logger.warning("The model will not be saved - saving folder need to be specified")
                 
                 if DEBUG >= 1:
                     logger.info(f"Epoch {epoch+1} completed in {epoch_time:.2f} seconds")
@@ -237,13 +253,21 @@ class DualModalityTrainer(Trainer):
                     logger.info(f"Best loss: {self.best_loss:.4f} at epoch {self.best_epoch}")
                     break
             
+            self.train_losses.append(avg_loss)
+            self.val_losses.append(eval_loss)
             self.epoch += 1
         
+        self.plot_metrics()
         logger.success("Training finished.")
 
     def _save_best(self):
         """Save the best model checkpoint (overrides parent to handle two models)."""
-        save_path = f"{self.save_best_dir}{self.save_name}_best.pth"
+        save_dir = 'experiments/dsec/model_proposal/best'
+        os.makedirs(save_dir, exist_ok=True)  # creates the folder if it doesn't exist
+        save_path = os.path.join(save_dir, 'best_checkpoint.pth')
+        print(f"Attempting to save to: {save_path}")
+        print(f"Directory exists: {os.path.exists(os.path.dirname(save_path))}")
+        print(f"Directory writable: {os.access(os.path.dirname(save_path), os.W_OK)}")
         
         model_state = {
             'model1': self.best_params
@@ -259,6 +283,27 @@ class DualModalityTrainer(Trainer):
             'config': self.cfg
         }, save_path)
         logger.success(f"Saved best model to {save_path}")
+    
+    def plot_metrics(self):
+        epochs = range(1, len(self.train_losses) + 1)
+        
+        fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+        
+        axes[0].plot(epochs, self.train_losses, label=self.cfg.get('run_name', 'run'))
+        axes[0].set_title('Training Loss')
+        axes[0].set_xlabel('Epoch')
+        axes[0].set_ylabel('Loss')
+        axes[0].legend()
+        
+        axes[1].plot(epochs, self.val_losses, label=self.cfg.get('run_name', 'run'))
+        axes[1].set_title('Validation Loss')
+        axes[1].set_xlabel('Epoch')
+        axes[1].set_ylabel('Loss')
+        axes[1].legend()
+        
+        plt.tight_layout()
+        plt.savefig("dualmodality_metrics.png", dpi=150)  # ← saves to file
+        plt.close()
     
     def _save_checkpoint(self, epoch):
         """Save a training checkpoint (overrides parent to handle two models)."""
@@ -332,11 +377,18 @@ class DualModalityTrainer(Trainer):
 
 
     def _get_loss_keys(self):
-        lmodel1 = get_loss_keys_model(self.model1)
-        lmodel2 = get_loss_keys_model(self.model2) if self.model2 is not None else []
-        for i, k in enumerate(lmodel1):
-            lmodel1[i] = f"model1/{k}"
-        for i, k in enumerate(lmodel2):
-            lmodel2[i] = f"model2/{k}"
-        mm_loss_name = str(self.criterion.__class__.__name__).lower()
-        self.losses_keys = ['multimodal_'+mm_loss_name] + lmodel1 + lmodel2
+        try: 
+            lmodel1 = get_loss_keys_model(self.model1)
+            lmodel2 = get_loss_keys_model(self.model2) if self.model2 is not None else []
+            for i, k in enumerate(lmodel1):
+                lmodel1[i] = f"model1/{k}"
+            for i, k in enumerate(lmodel2):
+                lmodel2[i] = f"model2/{k}"
+            mm_loss_name = str(self.criterion.__class__.__name__).lower()
+            self.losses_keys = ['multimodal_'+mm_loss_name] + lmodel1 + lmodel2
+        except Exception as e:
+            logger.warning(f"Could not extract loss keys: {e}")
+            # Fallback — match the keys your model actually returns
+            self.losses_keys = ['multimodal_crossentropyloss', 
+                                'model1/weighted_iou', 'model1/loss_obj', 
+                                'model1/loss_cls', 'model1/loss_l1']

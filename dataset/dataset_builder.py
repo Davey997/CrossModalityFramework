@@ -10,14 +10,14 @@ from utils.helpers import DEBUG
 from .dsec import DSECDataset  # make sure this import path is correct based on your project structure
 from .cityscapes import CityscapesDataset
 
-def build_from_config(cfg):
+def build_from_config(cfg): #where cfg is the .yaml config 
     """
     Factory method. Given the dataset configuration dictionary, instantiate and return the desired dataset train and test split.
     
     Currently implemented: DSEC_Night dataset.
     """
     assert "dataset" in cfg.keys(), "'dataset' params list missing from config file "
-    dataset_cfg = cfg.get("dataset")
+    dataset_cfg = cfg.get("dataset") 
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     dataset_name = dataset_cfg.get("name", None)
     
@@ -53,7 +53,7 @@ def build_from_config(cfg):
         
         txt_dir = project_root + "/dataset/"
         # Construct the dataset_txt_path (adjust the filename if needed)
-        dataset_txt_path = os.path.join(txt_dir, dataset_cfg.get("train_split", "night_dataset.txt"))
+        dataset_txt_path = os.path.join(txt_dir, dataset_cfg.get("train_split", "night_dataset_warp.txt"))
         if not os.path.exists(dataset_txt_path):
             raise FileNotFoundError(f"Dataset file {dataset_txt_path} does not exist. Please check the data_dir and filename.")
         

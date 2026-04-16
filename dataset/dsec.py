@@ -15,6 +15,7 @@ from .utils.transforms import SquarePad
 #global utils
 from utils import visualization as visual
 from utils import boxes
+from pathlib import Path
 #import mmcv
 import numpy as np
 # from mmcv.utils import print_log
@@ -200,6 +201,11 @@ class DSECDataset(Dataset):
         self.output_num = output_num
         self.CLASSES, self.PALETTE = classes, palette
         self.dataset_txt = np.loadtxt(self.dataset_txt_path, dtype=str, encoding='utf-8')
+        #debug
+        print("dataset_txt_path:", self.dataset_txt_path)
+        print("dataset_txt shape:", self.dataset_txt.shape)
+        print("dataset_txt content:", self.dataset_txt)
+
         self.events_height = 480
         self.events_width = 640
         self.mean_std = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
@@ -254,7 +260,10 @@ class DSECDataset(Dataset):
                 False).
         """
         image_path = self.dataset_txt[idx][0]
-        events_h5_path = image_path.replace('images', 'events')[:-20] + 'events.h5'
+        #events_h5_path = image_path.replace('images', 'events')[:-20] + 'events.h5'
+
+        events_h5_path = 'data/DSEC_Night/zurich_city_09_a_events_left/events.h5' #let's try this instead
+
         sequence_name = image_path.split('/')[-5]
         output = dict()
 
@@ -271,7 +280,7 @@ class DSECDataset(Dataset):
         if 'image' in self.outputs:
             if DEBUG>2: start_time= time.perf_counter() #TODO: Understand WTF is happening here
             if 'BB' in self.outputs: # so object detection task:
-                dist_img_path = image_path.replace('rectified', 'distorted')
+                dist_img_path =  image_path.replace('distorted','rectified') #image_path.replace('rectified', 'distorted')
                 image = Image.open(dist_img_path).convert('RGB')
                 output['image'] = self.obj_det_transform(image)
             else: #'seg_map' in self.outputs:    
@@ -314,9 +323,12 @@ class DSECDataset(Dataset):
                 self.y_ev = np.asarray(h5_file['events/y'])
                 self.p_ev = np.asarray(h5_file['events/p'])
             # Get events for current frame
-            images_to_events_index = np.loadtxt(
-                image_path.split('left/rectified')[0] + 'images_to_events_index.txt',
-                dtype=str, encoding='utf-8')
+            index_path = Path(image_path).parent / "images_to_events_index.txt"
+            images_to_events_index = np.loadtxt(index_path, dtype=str, encoding='utf-8')
+
+            #images_to_events_index = np.loadtxt(
+             #   image_path.split('left/rectified')[0] + 'images_to_events_index.txt',
+              #  dtype=str, encoding='utf-8')
             events_finish_index = int(images_to_events_index[now_image_index])
             
             if self.events_num > 0:
@@ -386,43 +398,100 @@ class DSECDataset(Dataset):
         if 'BB' in self.outputs:
             bb_out = torch.zeros((self.max_labels, 5))
             bb_out[:] = -1  # to identify empty bbs
-            images_to_events_index = np.loadtxt(image_path.split('left/rectified')[0] + 'images_to_events_index.txt',
-                                                    dtype=str, encoding='utf-8')
-            timestamps = np.loadtxt(image_path.split('left/rectified')[0]+"timestamps.txt", dtype='uint64')
-            bb_path = image_path.split('images/left/rectified')[0] + "object_detections/left/tracks.npy"
-            bounding_boxes = np.load(bb_path,"r")
+
+
+            #images_to_events_index = np.loadtxt(image_path.split('left/rectified')[0] + 'images_to_events_index.txt',
+                                                    #dtype=str, encoding='utf-8')
+            
+            #//DAVID'S CHANGES START HERE
+
+            base_dir = os.path.dirname(image_path) 
+            images_to_events_index_path = os.path.join(base_dir, 'images_to_events_index.txt')
+
+            if not os.path.exists(images_to_events_index_path):
+                raise FileNotFoundError(f"{images_to_events_index_path} not found")
+
+            #images_to_events_index = np.loadtxt(images_to_events_index_path, dtype=str, encoding='utf-8')
+
+            #These 3 lines are commented out to test the ones below 
+
+            #png_dir = os.path.dirname(image_path)
+            #index_file = os.path.join(png_dir, 'images_to_events_index.txt')
+            #images_to_events_index = np.loadtxt(index_file, dtype=str, encoding='utf-8')
+
+            # Folder where the PNG really is
+            png_dir = os.path.dirname(image_path)
+
+            # The folder name is: zurich_city_09_a_images_rectified_left
+            seq_name = os.path.basename(png_dir).replace("_images_rectified_left", "")
+
+            # 1. Path to images_to_events_index.txt next to your PNGs
+            index_file = os.path.join(png_dir, "images_to_events_index.txt")
+            if not os.path.exists(index_file):
+                raise FileNotFoundError(f"Missing {index_file}")
+
+            images_to_events_index = np.loadtxt(index_file, dtype=str, encoding='utf-8')
+
+            #DAVID'S CHANGES END HERE
+
+            #timestamps = np.loadtxt(image_path.split('left/rectified')[0]+"timestamps.txt", dtype='uint64')
+
+            timestamps_path = os.path.join(
+                os.path.dirname(image_path),
+                "timestamps.txt"
+            )
+            timestamps = np.loadtxt(timestamps_path, dtype="uint64")
+            #bb_path = image_path.split('images/left/rectified')[0] + "object_detections/left/tracks.npy"
+            #bounding_boxes = np.load(bb_path,"r")
+
+            sequence_dir = os.path.dirname(image_path)
+
+            bb_path = os.path.join(
+                sequence_dir,
+                "object_detections",
+                "left",
+                "tracks.npy"
+            )
+            
+            if os.path.exists(bb_path):
+                bounding_boxes = np.load(bb_path, allow_pickle=True)
+            else:
+                bounding_boxes = None
 
             #mask to obtain only bbs for the actual frame
-            mask = bounding_boxes['t'] == timestamps[now_image_index]
-            filtered_boxes = bounding_boxes[mask]
-            
-            for i in range(len(filtered_boxes)):
-                if i >= self.max_labels: 
-                    break
+            if bounding_boxes is not None: 
+                mask = bounding_boxes['t'] == timestamps[now_image_index]
+                filtered_boxes = bounding_boxes[mask]
+                
+                for i in range(len(filtered_boxes)):
+                    if i >= self.max_labels: 
+                        break
                     
-                # Extract original bbox coordinates (use different variable names!)
-                class_id = float(filtered_boxes[i][5])
-                bbox_x = float(filtered_boxes[i][1])
-                bbox_y = float(filtered_boxes[i][2]) 
-                bbox_w = float(filtered_boxes[i][3])
-                bbox_h = float(filtered_boxes[i][4])
+                    # Extract original bbox coordinates (use different variable names!)
+                    class_id = float(filtered_boxes[i][5])
+                    bbox_x = float(filtered_boxes[i][1])
+                    bbox_y = float(filtered_boxes[i][2]) 
+                    bbox_w = float(filtered_boxes[i][3])
+                    bbox_h = float(filtered_boxes[i][4])
 
-                # Store scaled coordinates
-                bb_out[i,0] = torch.tensor(class_id)
-                bb_out[i,1] = torch.tensor(bbox_x)
-                bb_out[i,2] = torch.tensor(bbox_y)
-                bb_out[i,3] = torch.tensor(bbox_w)
-                bb_out[i,4] = torch.tensor(bbox_h)
-                # Bbox are for 640x480 frame, need to be scaled to model input size, careful with padding
-                if self.model_in_size != 640:
-                    #bb_out[i,2] = bb_out[i,2] + np.abs(self.model_in_size-480) / 2
-                    scale = self.model_in_size / 640
-                    bb_out[i,1] = bb_out[i,1] * scale
-                    bb_out[i,2] = bb_out[i,2] * scale
-                    bb_out[i,3] = bb_out[i,3] * scale
-                    bb_out[i,4] = bb_out[i,4] * scale
-                    # handling padding (square image input to the model)
-                    bb_out[i,2] = bb_out[i,2] + (self.model_in_size - int(scale*480)) / 2
+                    # Store scaled coordinates
+                    bb_out[i,0] = torch.tensor(class_id)
+                    bb_out[i,1] = torch.tensor(bbox_x)
+                    bb_out[i,2] = torch.tensor(bbox_y)
+                    bb_out[i,3] = torch.tensor(bbox_w)
+                    bb_out[i,4] = torch.tensor(bbox_h)
+                    # Bbox are for 640x480 frame, need to be scaled to model input size, careful with padding
+                    if self.model_in_size != 640:
+                        #bb_out[i,2] = bb_out[i,2] + np.abs(self.model_in_size-480) / 2
+                        scale = self.model_in_size / 640
+                        bb_out[i,1] = bb_out[i,1] * scale
+                        bb_out[i,2] = bb_out[i,2] * scale
+                        bb_out[i,3] = bb_out[i,3] * scale
+                        bb_out[i,4] = bb_out[i,4] * scale
+                        # handling padding (square image input to the model)
+                        bb_out[i,2] = bb_out[i,2] + (self.model_in_size - int(scale*480)) / 2
+            else: 
+                filtered_boxes = []
 
             output['BB'] = bb_out
 
@@ -777,16 +846,4 @@ if __name__ == '__main__':
     print(dataset[45]['image'])
     gif_img = []
     # for i in tqdm(range(45)):
-    #     data_0 = dataset[i]
-    #     events_vg = data_0['events_vg']
-    #     events_vg = torch.mean(events_vg, dim=0, keepdim=True)
-    #     events_vg = (events_vg + 1) / 2 * 255
-    #     events_vg = events_vg.repeat(3, 1, 1).numpy()
-    #     events_vg = np.uint8(np.transpose(events_vg, (1, 2, 0)))
-    #     img = Image.fromarray(events_vg)
-    #     gif_img.append(img)
-
-
-    #gif_img[0].save('animation.gif', save_all=True, append_images=gif_img[1:], optimize=False, duration=200, loop=1)
-
-
+    #     data_0 = dat

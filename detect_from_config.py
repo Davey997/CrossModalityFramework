@@ -126,17 +126,22 @@ def load_model_from_config(cfg, checkpoint_path, device):
     """Load model from config and checkpoint."""
     print(f"Loading model from config and checkpoint: {checkpoint_path}")
     checkpoint = torch.load(checkpoint_path, map_location=device)
+    print(checkpoint.keys())
+
     cfg = checkpoint['config']
+
+    dual_modality = 'model1' in cfg and 'model2' in cfg
+    model_cfg_key = 'model1' if dual_modality else 'model'
     # Build model from config
-    if 'head' in cfg['model'].keys():
-        model = build_model_from_cfg(cfg['model'])
+    if 'head' in cfg[model_cfg_key].keys():
+        model = build_model_from_cfg(cfg) #
     else:
         # Backbone only model
-        dual_modality = 'rgb_backbone' in cfg['model']['backbone'] and 'event_backbone' in cfg['model']['backbone']
+        dual_modality_backbone = 'rgb_backbone' in cfg['model']['backbone'] and 'event_backbone' in cfg['model']['backbone']
         pretrained_weights = cfg['model']['backbone'].get('pretrained_weights', None)
         pretrained = cfg['model']['backbone'].get('pretrained', True)
         
-        if dual_modality:
+        if dual_modality_backbone:
             model = DualModalityBackbone(
                 rgb_backbone=cfg['model']['backbone']['rgb_backbone'],
                 event_backbone=cfg['model']['backbone']['event_backbone'],
@@ -144,6 +149,7 @@ def load_model_from_config(cfg, checkpoint_path, device):
                 img_size=cfg['model']['backbone']['input_size'],
                 pretrained=pretrained
             )
+
         else:
             backbone_name = cfg['model']['backbone'].get('rgb_backbone') or cfg['model']['backbone'].get('event_backbone')
             model = UnimodalBackbone(
@@ -152,20 +158,30 @@ def load_model_from_config(cfg, checkpoint_path, device):
                 embed_dim=cfg['model']['backbone']['embed_dim'],
                 img_size=cfg['model']['backbone']['input_size']
             )
-    
-    # Load checkpoint
-    #checkpoint = torch.load(checkpoint_path, map_location=device)
-    if 'model_state_dict' in checkpoint:
-        model.load_state_dict(checkpoint['model_state_dict'])
-    elif 'model' in checkpoint:
-        model.load_state_dict(checkpoint['model'])
-    else:
-        model.load_state_dict(checkpoint)
-    
-    model.to(device)
-    model.eval()
-    print(f"Model loaded successfully")
-    return model
+
+        if dual_modality:
+            model1, model2 = model
+            if 'model1_state_dict' in checkpoint:
+                model1.load_state_dict(checkpoint['model1_state_dict'])
+                model2.load_state_dict(checkpoint['model2_state_dict'])
+            elif 'model_state_dict' in checkpoint:
+                # Fallback por si el checkpoint guardó ambos juntos
+                model1.load_state_dict(checkpoint['model_state_dict'], strict=False)
+                model2.load_state_dict(checkpoint['model_state_dict'], strict=False)
+            model1.to(device).eval()
+            model2.to(device).eval()
+            print(f"Dual Modality Model loaded successfully")
+            return (model1, model2), cfg
+        else:
+            if 'model_state_dict' in checkpoint:
+                model.load_state_dict(checkpoint['model_state_dict'])
+            elif 'model' in checkpoint:
+                model.load_state_dict(checkpoint['model'])
+            else:
+                model.load_state_dict(checkpoint)
+            model.to(device),eval()
+            print(f"Model loaded successfully")
+            return model, cfg
 
 def get_transform(input_size):
     """Get image transformation pipeline."""
@@ -179,9 +195,12 @@ def detect_image(model, image, transform, device, confidence_threshold=0.5):
     """Run detection on a single image and apply post processing."""
 
     img_tensor = transform(image).unsqueeze(0).to(device) if transform is not None else image
-    outputs, _ = model(img_tensor)
-    outputs = postprocess(outputs, num_classes=8, conf_thre=confidence_threshold) # After this, boxes are in (x1, y1, x2, y2) format
+    #outputs, _ = model(img_tensor)
+    #outputs = postprocess(outputs, num_classes=8, conf_thre=confidence_threshold) # After this, boxes are in (x1, y1, x2, y2) format
     
+    with torch.no_grad():
+        outputs = model(img_tensor)
+        
     return outputs
 
 def rescale_boxes(boxes, original_size):
@@ -340,10 +359,19 @@ def main(args):
         cfg = yaml.safe_load(f)
     args.device = "cpu"
     # Load model
-    model = load_model_from_config(cfg, args.checkpoint_path, args.device)
-    
+    try: 
+        result = load_model_from_config(cfg, args.checkpoint_path, args.device)
+        print("resultado:", result)
+        model, cfg = result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+
     # Get transform
-    input_size = cfg['model']['backbone']['input_size']
+    dual_modality = 'model1' in cfg and 'model2' in cfg
+    model_cfg_key = 'model1' if dual_modality else 'model'
+
+    input_size = cfg[model_cfg_key]['backbone']['input_size']
     transform = get_transform(input_size)
     
     # Define classes (adapt based on your dataset)
@@ -360,22 +388,27 @@ def main(args):
             image_paths.extend(glob.glob(os.path.join(args.input_dir, ext)))
             image_paths.extend(glob.glob(os.path.join(args.input_dir, ext.upper())))
         
-        image_paths = sort(image_paths)
+        image_paths = sorted(image_paths)
         print(f"Found {len(image_paths)} images in {args.input_dir}")
         
+        os.makedirs(args.output_dir, exist_ok=True)
         for img_path in image_paths:
             print(f"\nProcessing: {img_path}")
             
             try:
                 image = Image.open(img_path).convert('RGB')
-                boxes, scores = detect_image(model, image, transform, args.device, args.confidence_threshold)
+                outputs = detect_image(model, image, transform, args.device, args.confidence_threshold)
+
+                image_np = np.array(image)
+                image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
                 
                 # Save result
                 base_name = os.path.splitext(os.path.basename(img_path))[0]
                 output_path = os.path.join(args.output_dir, f"{base_name}_detection.png")
+                cv2.imwrite(output_path, image_np)
                 
-                detection_count = plot_detections(image, boxes, scores, classes, output_path, args.confidence_threshold)
-                print(f"Found {detection_count} detections")
+                #detection_count = plot_detections(image, boxes, scores, classes, output_path, args.confidence_threshold)
+                #print(f"Found {detection_count} detections")
                 
             except Exception as e:
                 print(f"Error processing {img_path}: {e}")

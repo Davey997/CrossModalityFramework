@@ -6,6 +6,7 @@ import h5py
 from tqdm import tqdm
 import argparse
 import torch
+import random #was missing
 # This script creates the vg files in npy format for faster opening.
 # TODO: make this script indipendent from the type of event representation, so not only VGs.
  
@@ -147,7 +148,7 @@ def get_events_vg(events_h5, rectify_map, events_finish_index, events_start_inde
                                          num_bins=EVENT_BINS, normalize_flag=False)
 
         if EVENT_CLIP_RANGE is not None:
-            events_clip_range = random.uniform(self.events_clip_range[0], self.events_clip_range[1])
+            events_clip_range = random.uniform(EVENT_CLIP_RANGE[0], EVENT_CLIP_RANGE[1]) #no self needed
         else:
             events_clip_range = (events_finish_index - events_start_index) / 500000 * 1.5
             # events_clip_range = 'auto'

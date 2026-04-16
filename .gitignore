@@ -9,3 +9,6 @@ backbone_saves/
 dataset/*.txt
 .cache_dir/
 cityscapes_random_viz/*
+*.zip
+logs/
+nohup.out

@@ -191,8 +191,11 @@ class Trainer:
 
             elif hasattr(self.dataloader.dataset, 'evaluate'):
                 # Use dataset's evaluate method
-                ap50_95, ap50, _ = self.dataloader.dataset.evaluate(self.model)
-                if DEBUG >= 1: logger.info(f"AP50-95: {ap50_95:.4f}, AP50: {ap50:.4f}")
+                try:
+                    ap50_95, ap50, _ = self.dataloader.dataset.evaluate(self.model)
+                except AttributeError:
+                    print("Skipping dataset evaluation: get_gt_bb() not implemented")
+                #if DEBUG >= 1: logger.info(f"AP50-95: {ap50_95:.4f}, AP50: {ap50:.4f}")
 
             # Check for improvement and update patience counter
             if avg_loss < self.best_loss:

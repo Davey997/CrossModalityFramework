@@ -42,7 +42,7 @@ def init_wandb(cfg):
     run_name = f"{run_name}_{type_}_{cfg['optimizer']['name']}_{schedl_name}_{aug}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     
     if 'logger' in cfg.keys() and 'name' in cfg['logger'].keys():
-        if(cfg['logger']['name'] == 'wandb'):
+        if(cfg['logger']['name'] == 'wandb' and cfg['logger'].get('enabled', True)):
             wandb_cfg = cfg['logger']
             assert 'project' in wandb_cfg.keys(), "specify 'project' wandb param"
             assert 'entity' in wandb_cfg.keys(), "specify 'entity' wandb param"
@@ -96,10 +96,14 @@ if __name__ == "__main__":
     # Trainer
     assert 'trainer' in cfg.keys(), "'trainer' params list missing from config file "
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    if cfg['dual_modality']:
+    if cfg['dual_modality'] or cfg["model"]["name"] == "model_proposal":
         trainer = DualModalityTrainer(model, train_dl, opti, criterion, device, CFG, root_folder=dir_path, wandb_log=wandb_log, pretrained_checkpoint=pretrained_checkpoint)
     else:
         trainer = Trainer(model,train_dl, opti, device,  CFG, root_folder=dir_path, wandb_log=wandb_log, pretrained_checkpoint=pretrained_checkpoint, scheduler=schdlr)
 
-    evaluator = eval_builder.build_from_config(test_dl, cfg)
+    evaluator = None
+    if 'evaluator' in cfg:
+        evaluator = eval_builder.build_from_config(test_dl, cfg)
+
     trainer.train(evaluator=evaluator)
+

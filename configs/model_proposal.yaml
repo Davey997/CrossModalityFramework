@@ -1,0 +1,72 @@
+model:
+  name: 'model_proposal'
+  backbone:
+    name: 'resnet50'
+    pretrained: True
+    input_size: 512
+    embed_dim: 256 
+    output_indices: [3, 4]
+  fusion:
+    out_channels: 256
+    num_heads: 8
+    dropout: 0.1
+  head:
+    num_classes: 8
+    in_channels_raw: 2048
+    in_channels_fused: 256
+    fusion_channels: 256
+    img_size: 512
+
+# Training loop parameters
+trainer:
+  epochs: 50
+  log_interval: 100 # steps
+  val_interval: 500 # steps
+  checkpoint_interval_epochs: 5 # save checkpoint every 5 epochs
+  save_folder: experiments/dsec/model_proposal
+
+optimizer:
+  name: Adam
+  lr: 0.005
+  wd: 0.0005
+
+# Loss function parameters
+loss:
+  name: cross_entropy
+
+dataset:
+  name: DSEC_Night
+  data_dir: data
+  batch_size: 4
+  num_workers: 4
+  outputs: ["events", "images", "BB", "img_metas", "labels"] # these mandatory for unimodal training
+  custom_classes: True # if True, the model will use custom classes defined in the dataset
+  bb_num_classes: 8 # according to DSEC
+  train_split: "night_dataset_warp.txt"
+  val_split: "night_test_dataset_warp.txt"
+  use_augmentations: True
+  augmentations:
+    resize: [512, 1024] # height, width
+    hflip_prob: 0.5
+    scale: [0.8, 1.2]
+    ratio: [0.9, 1.1]
+
+scheduler:
+  name: 
+  factor: 0.1
+  patience: 3
+  monitor: val_loss
+  mode: min
+
+# Logging parameters
+logger:
+  name: wandb
+  project: Cross_Modality_Framework  # Replace with your wandb project name
+  entity: TwoGuysOneCode
+  enabled: False
+  run_name: "model_proposal"
+
+multi_modality_loss:
+  name: cross_entropy
+  weight: 1
+  features: flatten_feat

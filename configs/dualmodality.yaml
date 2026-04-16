@@ -13,8 +13,8 @@ dataset:
   outputs: ["events", "images", "BB", "img_metas", "labels"] # these mandatory for unimodal training
   custom_classes: True # if True, the model will use custom classes defined in the dataset
   bb_num_classes: 8 # according to DSEC
-  train_split: "night_dataset.txt"
-  val_split: "night_test_dataset.txt"
+  train_split: "night_dataset_warp.txt"
+  val_split: "night_test_dataset_warp.txt"
   use_augmentations: True
   augmentations:
     resize: [512, 1024] # height, width
@@ -26,7 +26,7 @@ dataset:
 model1:
   name: 'resnet50_yolox'
   # when using this, the successive parameters will be ignored
-  pretrained_weights: resnet50_uni_rgb_Adam_multistep_lr_noaug_20251016_222446_checkpoint_epoch_99_202510171030.pth #'../resnet50_backbone_from_detr.pth' # path to pretrained weights if needed
+  pretrained_weights: /home/dmoya/Cross_modality_CV_project/CrossModalityFramework/unimodal_rgb_checkpoints/resnet50_uni_rgb_Adam_multistep_lr_noaug_20260210_102023_checkpoint_epoch_4_202602101025.pth # path to pretrained weights if needed
   head: 
     name: 'yolox_head' # redundant here, but useful for clarity
     num_classes: 8
@@ -42,10 +42,10 @@ model1:
 
 #event
 model2:
-  freeze: True # if True, the model2 weights will not be updated during training
+  freeze: False # if True, the model2 weights will not be updated during training
   name: 'resnet50_yolox'
   # when using this, the successive parameters will be ignored
-  pretrained_weights: unimodal_events_saves_251016/resnet50_uni_event_Adam_ReduceLROnPlateau_noaug_20251018_170457_checkpoint_epoch_99_202510182304.pth #'../resnet50_backbone_from_detr.pth' # path to pretrained weights if needed
+  pretrained_weights: /home/dmoya/Cross_modality_CV_project/CrossModalityFramework/unimodal_events_checkpoints/resnet50_uni_event_Adam_None_noaug_20260216_132124_checkpoint_epoch_4_202602161328.pth #'../resnet50_backbone_from_detr.pth' # path to pretrained weights if needed
   head: 
     name: 'yolox_head' # redundant here, but useful for clarity
     num_classes: 8
@@ -58,6 +58,9 @@ model2:
     input_size: 512
     output_indices: [3, 4]  # indices of the output layers to be used
     #dropout: 0.25
+
+fusion_module: 
+  name: "my_fusion_module"
 
 multi_modality_loss:
   name: CLIP
@@ -80,7 +83,7 @@ trainer:
   epochs: 100
   log_interval: 500 # steps
   checkpoint_interval_epochs: 5 # save checkpoint every 5 epochs
-  save_folder: dualModalty__chckpoints
+  save_folder: dualmodality_checkpoints
 
 # Scheduler parameters (optional)
 scheduler:
@@ -93,3 +96,5 @@ logger:
   name: wandb
   project: Cross_Modality_Framework  # Replace with your wandb project name
   entity: TwoGuysOneCode
+  enabled: False
+
