@@ -20,33 +20,31 @@ The proposed method is implemented through the following files:
 The main comparison can be seen in the training phase. The attention-based fusion module makes the model converge to a much lower loss, much sooner. Both methods converge rapidly to a low loss and stay around that value for the rest of the epochs, with Cross Modality setting at around 1.38 most of the training, whereas the fusion module goes as low as a .001 order of magnitude within the first 10 epochs, before stabilizing. Although this range might indicate overfitting risk, it's worth mentioning the training process was much faster and the loss was lower. The improved efficiency could be attributed to how the Fusion Module handles both modalities at the same time, instead of separately.
 
 Here we can see the training loss from the Fusion Module
-<div style="width: 300px; overflow: hidden;">
-  <img src="run_metrics.png" style="width: 600px;">
+<div style="width: 50%; overflow: hidden;">
+  <img src="run_metrics.png" style="width: 100%;">
 </div>
 
 Here is the training loss of the Cross Modality model
-<div style="width: 300px; overflow: hidden;">
-  <img src="dualmodality_metrics.png" style="width: 600px;">
+<div style="width: 50%; overflow: hidden;">
+  <img src="dualmodality_metrics.png" style="width: 100%;">
 </div>
 
 ## How to run the attention-based method 
 
 First of all, the environment must be activated and the dependencies installed. We do this through this script:
 
-    ```bash
-    conda activate CMF
-    sh install_req.sh
-    ```
+    ```conda activate CMF
+    sh install_req.sh```
 
 Once we've done that, just like with the original Cross Modality framework:
 
-    1. Ensure the root directory of each dataset (or a symlink to it) is placed within the `data/` folder.
-    2. Run the appropriate script to generate the train and validation split files.
+1. Ensure the root directory of each dataset (or a symlink to it) is placed within the `data/` folder.
+2. Run the appropriate script to generate the train and validation split files.
 
-        - **For Cityscapes:**
-            ```bash
-            python dataset/create_cs_txt.py
-            ```
+    - **For Cityscapes:**
+         ```
+        python dataset/create_cs_txt.py
+        ```
 
         - **For DSEC-Night:**
             ```bash
