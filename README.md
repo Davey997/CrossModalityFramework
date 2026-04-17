@@ -20,10 +20,14 @@ The proposed method is implemented through the following files:
 The main comparison can be seen in the training phase. The attention-based fusion module makes the model converge to a much lower loss, much sooner. Both methods converge rapidly to a low loss and stay around that value for the rest of the epochs, with Cross Modality setting at around 1.38 most of the training, whereas the fusion module goes as low as a .001 order of magnitude within the first 10 epochs, before stabilizing. Although this range might indicate overfitting risk, it's worth mentioning the training process was much faster and the loss was lower. The improved efficiency could be attributed to how the Fusion Module handles both modalities at the same time, instead of separately.
 
 Here we can see the training loss from the Fusion Module
-![Fusion Module trainig loss](run_metrics.png)
+<div style="width: 300px; overflow: hidden;">
+  <img src="run_metrics.png" style="width: 600px;">
+</div>
 
 Here is the training loss of the Cross Modality model
-![Cross Modality training loss](dualmodality_metrics.png)
+<div style="width: 300px; overflow: hidden;">
+  <img src="dualmodality_metrics.png" style="width: 600px;">
+</div>
 
 ## How to run the attention-based method 
 
