@@ -1,6 +1,6 @@
 data/
 *.gif
-*.png
+#*.png
 __pycache__/
 .vscode/
 wandb/
