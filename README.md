@@ -21,20 +21,20 @@ The main comparison can be seen in the training phase. The attention-based fusio
 
 Here we can see the training loss from the Fusion Module
 <div style="width: 50%; overflow: hidden;">
-  <img src="run_metrics.png" style="width: 100%;">
+  <img src="run_metrics.png" style="width: 50%;">
 </div>
 
 Here is the training loss of the Cross Modality model
 <div style="width: 50%; overflow: hidden;">
-  <img src="dualmodality_metrics.png" style="width: 100%;">
+  <img src="dualmodality_metrics.png" style="width: 50%;">
 </div>
 
 ## How to run the attention-based method 
 
 First of all, the environment must be activated and the dependencies installed. We do this through this script:
 
-    ```conda activate CMF
-    sh install_req.sh```
+    ``conda activate CMF
+    sh install_req.sh``
 
 Once we've done that, just like with the original Cross Modality framework:
 
@@ -46,10 +46,10 @@ Once we've done that, just like with the original Cross Modality framework:
         python dataset/create_cs_txt.py
         ```
 
-        - **For DSEC-Night:**
-            ```bash
-            python dataset/create_dataset_txt.py
-            ```
+    - **For DSEC-Night:**
+        ```bash
+        python dataset/create_dataset_txt.py
+        ```
     - After having both the dataset and environment ready, we can train the model through this command:
       ```bash
       python train_from_config.py configs/model_proposal.yaml
