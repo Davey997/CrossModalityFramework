@@ -17,7 +17,9 @@ The proposed method is implemented through the following files:
 - [Configuration](configs/model_proposal.yaml) — Training and evaluation configuration
 
 ## Results 
-The main comparison can be seen in the training phase. The attention-based fusion module makes the model converge to a much lower loss, much sooner. Both methods converge rapidly to a low loss and stay around that value for the rest of the epochs, with Cross Modality setting at around 1.38 most of the training, whereas the fusion module goes as low as a .001 order of magnitude within the first 10 epochs, before stabilizing. Although this range might indicate overfitting risk, it's worth mentioning the training process was much faster and the loss was lower. The improved efficiency could be attributed to how the Fusion Module handles both modalities at the same time, instead of separately.
+The main comparison can be seen in the training phase. Contrary to the initial hypothesis, both the baseline Cross Modality architecture and the attention-based fusion module produced nearly identical training loss curves, with no significant improvement in convergence speed or final loss value. 
+
+Possible explanations include insufficient architectural integration of the attention module, or that the dataset and training conditions did not expose a meaningful difference between both approaches. This exercise was useful for understanding multimodal feature fusion and the practical challenges of modifying existing architectures.
 
 Here we can see the training loss from the Fusion Module
 <div style="width: 400px; height: 300px; overflow: hidden; position: relative;">
